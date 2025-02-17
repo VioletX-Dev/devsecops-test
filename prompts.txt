@@ -1,0 +1,13 @@
+1. Pretend you are senior security engineer with 10 years of experience working at Google. Tell me how to run multithreads in Golang, or if there is a way to use go routines in a 
+concurrent fashion to check the available CPU procesors and then run multiple threads.
+
+2. Pretend you're a vulnerability or a security analyst, how would you weight in the source factor like aws, github in a combination with the CVSS score, severity, CVE identifier and vulnerability.
+
+3. Pretend you're a golang software engineer, how would you isolate each function and write unit tests for the same. 
+
+4. Is there any vulnerability prioratization algorithm followed by NIST or any of the organizations, and if not can I make a weighted approach according to my usecase. 
+
+5. Using goroutines, I achieved a time completion of 54ms od you think this beats the python threads?
+
+6. whats ISO time convention, and how do i write a fucntion in go for formatting this 'd-mm-yy' into ISO one. 
+
