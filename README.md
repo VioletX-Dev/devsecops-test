@@ -1,109 +1,122 @@
 # DevSecOps Technical Assessment
 
-## Overview
-**Duration:** End of the day - FEB. 17TH, 2025
+VulnTool: Vulnerability Prioritization Utility
 
-**Role:** Security Operations Intern  
 
-**Focus Area:** Vulnerability Management & Risk Assessment
+# Overview
+VulnTool is a command-line utility written in Go that ingests CSV data containing vulnerability
+records, computes a normalized priority score (scaled from 0 to 10) for each vulnerability, and
+exports the results in both CSV and JSON formats in miliseconds using goroutines concurrently. 
 
-## Background
+# Prerequisites
 
-Our company helps organizations achieve SOC2 certification. A critical aspect of this process is vulnerability management and prioritization. This assessment will evaluate your ability to process security data and create actionable insights.
+- **Go Language**: Version 1.18 or later. Download and installation instructions are available at:
+  https://golang.org/dl.
 
-## Task Description
+- **CSV Input File**: VulnTool expects a CSV file with the following header fields:
 
-- You are tasked with creating a script that processes vulnerability data and implements a prioritization algorithm to help customers address their security issues efficiently.
-- Use a programming language of your choise.
-- You are free to use any AI tool, if so, describe what one you used and save the prompt and attach it to the project.
+      Unique ID, Asset name, Asset id, Organization/Account, Identifier, Source, CVSS,
+      Title, Description, Package Name, Installed Version, Fixed Version, Remediation,
+      Severity, Due date, First detected date, Fixability
 
-### Input Data
+  *Note*: Date fields ("Due date" and "First detected date") must be provided in the MM/DD/YY. 
 
-You will be provided with a CSV file containing vulnerability data with the following fields:
+# Build and Installation
 
-* CVE_Number
-* Description
-* CVSS_Score (0-10)
-* Severity (Critical, High, Medium, Low)
-* Affected_Package
-* Fixed_Package_Version
-* Discovery_Date
-* Audit_Due_Date
-* Source (AWS, GitHub)
+1. **Clone the Repository**:
+   git clone <repository_url>
+2. **Navigate to the Project Directory**:
+   cd vulntool
+3. **Build the Executable**:
+   go build -o vulntool
 
-### Requirements
+# Usage Instructions
 
-#### 1. Data Processing
+Execute VulnTool with the following command-line flags:
 
-* Create a script that can read and parse the provided CSV file
-* Implement error handling for missing or malformed data
-* Create appropriate data structures to store and process the vulnerability information
+    ./vulntool -input vuln_findings_export_ACMEINC20250205a-FULL.csv -output_csv prioritized_vulnerabilities.csv \
+      -output_json prioritized_vulnerabilities.json -print=true
 
-#### 2. Prioritization Algorithm
+The available flags include:
+  - `-input`: Path to the input CSV file.
+  - `-output_csv`: Path to the output CSV file.
+  - `-output_json`: Path to the output JSON file.
+  - `-print`: Boolean flag to display the summary table on the terminal.
+  - Severity weights: `-critical`, `-high`, `-medium`, `-low`
+  - Source-specific weights: `-aws`, `-github`
+  - Fix penalty: `-fix_bonus`
 
-* Develop a scoring system that considers:
-  * CVSS Score
-  * Time until audit due date
-  * Severity level
-  * Source of vulnerability
-  * Availability of fix (Fixed_Package_Version)
-* Document your reasoning for the weights assigned to different factors
+# Time Tracking:
 
-#### 3. Output
+Upon completion of processing, VulnTool logs the total processing time. For example:
 
-* Generate a prioritized list of vulnerabilities
-* For each vulnerability, include:
-  * Original vulnerability details
-  * Calculated priority score
-  * Recommended action timeframe
-* Export results in both CSV and JSON formats
+    2025/02/17 12:58:11 Processing completed in 54.938791ms
 
-#### 4. Code Quality
+This performance metric enables users to compare the efficiency of this Go implementation with alternative
+approaches (e.g., Python-based solutions), which are typically slower due to interpreted runtime overhead.
 
-* Include appropriate comments and documentation
-* Implement unit tests
-* Follow PEP 8 style guidelines
-* Include a requirements.txt file
+# Code Architecture
 
-### Sample Data
+### Data Model
+The core entity is the `Vulnerability` struct. It maps directly to the CSV columns and includes computed fields:
+  - **Basic Fields**: UniqueID, AssetName, AssetID, OrganizationAccount, Identifier, Source, CVSS, Title,
+    Description, PackageName, InstalledVersion, FixedVersion, Remediation, Severity, DueDate, FirstDetectedDate, Fixability.
+  - **Computed Fields**:
+      - **PriorityScore**: Calculated based on a weighted combination of the CVSS score, severity, due date proximity,
+        source of the vulnerability, and whether a fix is available.
+      - **RecommendedActionTimeframe**: Suggests a remediation timeframe (Immediate, Urgent, or Scheduled) based on the due date.
 
-CSV file is in the project.
+### CSV Parsing and Date Conversion
+- **CSV Parsing**:  
+  The `readCSV` function opens the input CSV, builds a header-to-index mapping, and iterates through each record,
+  converting rows into `Vulnerability` structs.
+- **Date Conversion**:  
+  The `convertMDYToISO` function transforms dates from the "M/D/YY" format into the ISO "YYYY-MM-DD" format,
+  interpreting the two-digit year as 2000 + YY (e.g., "9/15/69" becomes "2069-09-15").
 
-### Bonus Points
+### Priority Scoring Algorithm
+The `calculatePriorityScore` function computes a normalized score (0–10) by combining:
+  - **CVSS Component**: CVSS score multiplied by a severity-specific weight.
+  - **Time Component**: A bonus based on the number of days until the due date:
+      - Bonus 3 if due within 7 days.
+      - Bonus 2 if due within 30 days.
+      - Bonus 1 otherwise.
+  - **Source Component**: Additional bonus if the vulnerability originates from key sources (e.g., AWS or GitHub).
+  - **Fix Component**: A penalty if a fix is available.
+  
+Weights are user-configurable via command-line flags, ensuring the final score is normalized on a 0–10 scale.
 
-* Implementation of logging
-* CLI arguments for customizing prioritization weights
-* Docker containerization
-* API endpoint to query results
-* Visual representation of the data (graphs/charts)
+### Concurrency Model
+VulnTool leverages Go’s native concurrency with a worker-pool pattern:
+  - **Multithreading**:  
+    The `processVulnerabilities` function spawns a number of goroutines equal to the number of CPU cores, each
+    processing vulnerabilities concurrently.
+  - **Goroutines & Channels**:  
+    A channel-based pipeline feeds each vulnerability to a worker, which computes its priority score and recommended
+    action timeframe. The results are aggregated from a results channel, ensuring efficient parallel processing even
+    on large CSV files.
 
-## Evaluation Criteria
+### Output Generation
+VulnTool supports three output modes:
+  - **CSV Export**:  
+    The `writeCSV` function exports the processed vulnerabilities into a CSV file with an extended header.
+  - **JSON Export**:  
+    The `writeJSON` function outputs the data as well-formatted JSON.
+  - **Terminal Display**:  
+    The `printToTerminal` function renders a formatted summary table using Go’s `tabwriter` for quick review.
 
-### Technical Skills (60%)
+### Performance Metrics
+The tool records the overall processing time and logs this value to standard output. This metric demonstrates the
+efficiency of Go’s concurrent processing model, which typically outperforms equivalent Python implementations.
 
-* Code functionality (20%)
-* Algorithm design and efficiency (15%)
-* Error handling and edge cases (15%)
-* Testing implementation (10%)
 
-### Security Awareness (25%)
+# Unit Testing
 
-* Understanding of vulnerability severity (10%)
-* Risk assessment approach (15%)
+A comprehensive suite of unit tests is included to validate:
+  - Date conversion via `convertMDYToISO`
+  - Priority scoring via `calculatePriorityScore`
+  - CSV parsing and output functions (`readCSV`, `writeCSV`, `writeJSON`)
+  
+To execute the tests, run:
 
-### Code Quality (15%)
-
-* Documentation (5%)
-* Code organization (5%)
-* Adherence to the programming language best practices (5%)
-
-## Submission Instructions
-
-1. Fork this repository to your own Github account
-2. Include a README.md with:
-   * Setup instructions
-   * Usage examples
-   * Explanation of your prioritization algorithm
-   * Any assumptions made
-3. Open a Pull request to this repository
-4. Ping @cassio on Slack saying you finished the test
+    go test -v
