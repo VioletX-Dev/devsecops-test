@@ -44,7 +44,7 @@ Priority Score = (CVSS * 3) + (Severity Score * 2) + (Fix Available * 2) + (Sour
 - **Severity levels:** Critical (4), High (3), Medium (2), Low (1).
 - **Fixable vulnerabilities get an additional boost in score.**
 
-For more details, see [Algorithm Approach](algorithm_approach.md).
+For more details, see [Algorithm Approach](Algorithm Approach.docx).
 
 ## File Structure
 ```
